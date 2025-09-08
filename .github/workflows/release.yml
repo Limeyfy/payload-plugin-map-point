@@ -59,20 +59,34 @@ jobs:
           let published = [];
           try {
             const out = cp.execSync(`npm view ${name} versions --json`, { encoding: 'utf8' }).trim();
-            published = JSON.parse(out);
+            published = JSON.parse(out || '[]');
           } catch (e) {
             // package may not exist yet; continue
           }
           const exists = Array.isArray(published) && published.includes(current);
+          let next = current;
+          let bumped = false;
           if (exists) {
             cp.execSync('npm version patch --no-git-tag-version', { stdio: 'inherit' });
-            const next = JSON.parse(fs.readFileSync('package.json','utf8')).version;
+            next = JSON.parse(fs.readFileSync('package.json','utf8')).version;
+            bumped = true;
             console.log(`Bumped version to ${next}`);
-            console.log(`version=${next}`);
           } else {
-            console.log(`version=${current}`);
+            console.log(`Using version ${current}`);
+          }
+          const outFile = process.env.GITHUB_OUTPUT;
+          if (outFile) {
+            fs.appendFileSync(outFile, `version=${next}\n`);
+            fs.appendFileSync(outFile, `bumped=${String(bumped)}\n`);
           }
           NODE
+
+      - name: Commit version bump
+        if: steps.ensure_version.outputs.bumped == 'true'
+        run: |
+          git add package.json
+          git commit -m "chore(release): bump version to ${{ steps.ensure_version.outputs.version }}"
+          git push
           
       - name: Commit version bump
         run: |
