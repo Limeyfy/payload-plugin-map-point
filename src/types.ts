@@ -1,6 +1,7 @@
 export type GeocoderProvider = 'mapbox' | 'nominatim'
 
 export type MapPointPluginOptions = {
+  enabled?: boolean
   defaultCenter?: [number, number]
   defaultZoom?: number
   geocoder?: {
@@ -9,4 +10,3 @@ export type MapPointPluginOptions = {
     placeholder?: string
   }
 }
-
