@@ -3,6 +3,7 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AdminFieldProps } from "./types";
+import { envPublicKey } from "../token";
 
 export default function MapPointField(props: AdminFieldProps) {
 	const { value, onChange, field } = props;
@@ -15,9 +16,9 @@ export default function MapPointField(props: AdminFieldProps) {
 	const [query, setQuery] = useState("");
 	const [coords, setCoords] = useState<[number, number] | null>(null); // [lng, lat]
 
-	const apiKey = config.custom?.mapPointPluginOptions?.publicMapKey as
-		| string
-		| undefined;
+	const apiKey =
+		config.custom?.mapPointPluginOptions?.publicMapKey ||
+		(envPublicKey as string | undefined);
 
 	const mapStyleURL =
 		theme === "dark"
@@ -27,22 +28,22 @@ export default function MapPointField(props: AdminFieldProps) {
 	const ui =
 		theme === "dark"
 			? {
-					border: "#374151",
-					bg: "#111827",
-					bgAlt: "#1f2937",
-					text: "#e5e7eb",
-					subtle: "#9ca3af",
-					pin: "#ef4444",
-					pinBorder: "#111827",
+					border: "var(--theme-border-color)",
+					bg: "var(--theme-elevation-200)",
+					bgAlt: "var(--theme-elevation-150)",
+					text: "var(--theme-elevation-900)",
+					subtle: "var(--theme-elevation-400)",
+					pin: "var(--theme-error-400)",
+					pinBorder: "var(--theme-elevation-200)",
 				}
 			: {
-					border: "#cccccc",
-					bg: "#ffffff",
-					bgAlt: "#fafafa",
-					text: "#111111",
-					subtle: "#555555",
-					pin: "#ef4444",
-					pinBorder: "#ffffff",
+					border: "var(--theme-border-color)",
+					bg: "var(--theme-elevation-0)",
+					bgAlt: "var(--theme-elevation-50)",
+					text: "var(--theme-elevation-900)",
+					subtle: "var(--theme-elevation-500)",
+					pin: "var(--theme-error-400)",
+					pinBorder: "var(--theme-elevation-0)",
 				};
 
 	useEffect(() => {

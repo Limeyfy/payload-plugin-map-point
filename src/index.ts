@@ -2,6 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "payload";
 import type { MapPointPluginOptions } from "./types";
+import { envPublicKey } from "./token";
 
 // ---------------------------------------------
 // Types & helpers for recursively enhancing fields
@@ -175,29 +176,12 @@ export const mapPointPlugin: (options?: MapPointPluginOptions) => Plugin =
 			}));
 		}
 
-		// Expose public map key via config.custom for Admin/UI consumption
-		const envPublicKey =
-			process.env.NEXT_PUBLIC_MAPBOX_API_KEY ||
-			process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
-			process.env.MAPBOX_PUBLIC_TOKEN ||
-			process.env.MAPBOX_API_KEY ||
-			process.env.MAPBOX_TOKEN;
-
 		const publicMapKey = options?.geocoder?.apiKey ?? envPublicKey; // public only!
 		if (!publicMapKey) {
 			console.warn(
 				'[payload-plugin-map-point] No public API key provided in plugin options or env. Mapbox maps and geocoding may not work. Set "geocoder.apiKey" or NEXT_PUBLIC_MAPBOX_TOKEN.',
 			);
 		}
-
-		config.custom = {
-			...(config.custom || {}),
-			mapPointPluginOptions: {
-				// preserve anything previously set by user/app
-				...(config.custom as any)?.mapPointPluginOptions,
-				...(publicMapKey ? { publicMapKey } : {}),
-			},
-		};
 
 		// Keep existing onInit and warn if provider misconfigured
 		const priorOnInit = incomingConfig.onInit;
@@ -206,10 +190,7 @@ export const mapPointPlugin: (options?: MapPointPluginOptions) => Plugin =
 				await priorOnInit(payload);
 			}
 			const provider = options?.geocoder?.provider;
-			const apiKey =
-				options?.geocoder?.apiKey ||
-				process.env.MAPBOX_TOKEN ||
-				process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+			const apiKey = options?.geocoder?.apiKey || envPublicKey;
 			if (provider === "mapbox" && !apiKey) {
 				payload.logger?.warn?.(
 					"[map-point] Mapbox provider enabled but no API key provided",
