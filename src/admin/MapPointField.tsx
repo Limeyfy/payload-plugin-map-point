@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useConfig, useTheme } from "@payloadcms/ui";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AdminFieldProps } from "./types";
-import { useConfig, useTheme } from "@payloadcms/ui";
-
-const defaultCenter: [number, number] = [0, 0];
-const defaultZoom = 1;
 
 export default function MapPointField(props: AdminFieldProps) {
 	const { value, onChange, field } = props;
@@ -16,7 +13,6 @@ export default function MapPointField(props: AdminFieldProps) {
 	const mapContainer = useRef<HTMLDivElement>(null);
 
 	const [query, setQuery] = useState("");
-	const containerRef = useRef<HTMLDivElement | null>(null);
 	const [coords, setCoords] = useState<[number, number] | null>(null); // [lng, lat]
 
 	const apiKey = config.custom?.mapPointPluginOptions?.publicMapKey as
@@ -26,7 +22,7 @@ export default function MapPointField(props: AdminFieldProps) {
 	const mapStyleURL =
 		theme === "dark"
 			? "mapbox://styles/mapbox/dark-v11"
-			: "mapbox://styles/mapbox/streets-v12";
+			: "mapbox://styles/mapbox/outdoors-v12";
 
 	const ui =
 		theme === "dark"
@@ -55,7 +51,7 @@ export default function MapPointField(props: AdminFieldProps) {
 		if (mapContainer.current) {
 			const map = new mapboxgl.Map({
 				container: mapContainer.current,
-				style: "mapbox://styles/mapbox/outdoors-v12",
+				style: mapStyleURL,
 				center: coords || [60.656576, 11.907293],
 				zoom: 14,
 				maxZoom: 16,
@@ -69,7 +65,7 @@ export default function MapPointField(props: AdminFieldProps) {
 
 			return () => map.remove();
 		}
-	}, [coords]);
+	}, [coords, mapStyleURL]);
 
 	const geocode = useCallback(async (): Promise<void> => {
 		const provider = options?.geocoder?.provider;
