@@ -10,7 +10,7 @@ const defaultCenter: [number, number] = [0, 0];
 const defaultZoom = 1;
 
 export default function MapPointField(props: AdminFieldProps) {
-  const { value, onChange, field } = props;
+	const { value, onChange, field } = props;
 	const options = field?.admin?.mapPoint || {};
 
 	const containerRef = useRef<HTMLDivElement | null>(null);
@@ -118,11 +118,11 @@ export default function MapPointField(props: AdminFieldProps) {
 			updateMarker(value[0], value[1]);
 		}
 
-    map.on("click", (e: MapMouseEvent) => {
-      const { lng, lat } = e.lngLat;
-      updateMarker(lng, lat);
-      if (typeof onChange === "function") onChange([lng, lat]);
-    });
+		map.on("click", (e: MapMouseEvent) => {
+			const { lng, lat } = e.lngLat;
+			updateMarker(lng, lat);
+			if (typeof onChange === "function") onChange([lng, lat]);
+		});
 
 		return () => {
 			map.remove();
@@ -132,6 +132,7 @@ export default function MapPointField(props: AdminFieldProps) {
 	}, [mapboxgl, accessToken]);
 
 	// Update map style when theme changes
+	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	useEffect(() => {
 		if (!mapRef.current || !mapboxgl || !accessToken) return;
 		try {
@@ -153,7 +154,7 @@ export default function MapPointField(props: AdminFieldProps) {
 		}
 	}, [value, mapboxgl, accessToken]);
 
-  const geocode = useCallback(async (): Promise<void> => {
+	const geocode = useCallback(async (): Promise<void> => {
 		const provider = options?.geocoder?.provider;
 		const apiKey = options?.geocoder?.apiKey;
 		const q = query.trim();
@@ -189,10 +190,10 @@ export default function MapPointField(props: AdminFieldProps) {
 				}
 			}
 
-      if (lng != null && lat != null && mapRef.current) {
-        mapRef.current.flyTo({ center: [lng, lat], zoom: 14 });
-        if (typeof onChange === "function") onChange([lng, lat]);
-      }
+			if (lng != null && lat != null && mapRef.current) {
+				mapRef.current.flyTo({ center: [lng, lat], zoom: 14 });
+				if (typeof onChange === "function") onChange([lng, lat]);
+			}
 		} catch (e) {
 			// eslint-disable-next-line no-console
 			console.warn("Geocoding failed", e);
@@ -275,7 +276,7 @@ export default function MapPointField(props: AdminFieldProps) {
 				{value && (
 					<button
 						type="button"
-            onClick={() => typeof onChange === "function" && onChange(null)}
+						onClick={() => typeof onChange === "function" && onChange(null)}
 						style={{
 							marginLeft: "auto",
 							padding: "6px 10px",

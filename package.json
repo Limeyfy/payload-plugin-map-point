@@ -42,10 +42,10 @@
   ],
   "author": "",
   "peerDependencies": {
+    "mapbox-gl": ">=3.5.0",
     "payload": "^3.0.0",
     "react": ">=18",
-    "react-dom": ">=18",
-    "mapbox-gl": ">=3.5.0"
+    "react-dom": ">=18"
   },
   "devDependencies": {
     "@types/mapbox-gl": "^3.4.1",
@@ -56,5 +56,8 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@payloadcms/ui": "^3.54.0"
   }
 }
