@@ -14,7 +14,7 @@ export default function MapPointField(props: AdminFieldProps) {
 	const mapContainer = useRef<HTMLDivElement>(null);
 
 	const [query, setQuery] = useState("");
-	const [coords, setCoords] = useState<[number, number] | null>(null); // [lng, lat]
+	const [coords, setCoords] = useState<[number, number] | null>(value || null); // [lng, lat]
 
 	const apiKey =
 		config.custom?.mapPointPluginOptions?.publicMapKey ||
@@ -54,7 +54,7 @@ export default function MapPointField(props: AdminFieldProps) {
 				container: mapContainer.current,
 				style: mapStyleURL,
 				center: coords || [60.656576, 11.907293],
-				zoom: 14,
+				zoom: 13,
 				maxZoom: 16,
 				minZoom: 10,
 			});
@@ -66,7 +66,7 @@ export default function MapPointField(props: AdminFieldProps) {
 
 			return () => map.remove();
 		}
-	}, [coords, mapStyleURL]);
+	}, [coords, mapStyleURL, envPublicKey]);
 
 	const geocode = useCallback(async (): Promise<void> => {
 		const provider = options?.geocoder?.provider;
