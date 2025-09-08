@@ -10,7 +10,7 @@ const defaultCenter: [number, number] = [0, 0];
 const defaultZoom = 1;
 
 export default function MapPointField(props: AdminFieldProps) {
-	const { value, onChange, field } = props;
+  const { value, onChange, field } = props;
 	const options = field?.admin?.mapPoint || {};
 
 	const containerRef = useRef<HTMLDivElement | null>(null);
@@ -65,6 +65,8 @@ export default function MapPointField(props: AdminFieldProps) {
 				bgAlt: "#1f2937",
 				text: "#e5e7eb",
 				subtle: "#9ca3af",
+				pin: "#ef4444",
+				pinBorder: "#111827",
 			}
 		: {
 				border: "#cccccc",
@@ -72,7 +74,40 @@ export default function MapPointField(props: AdminFieldProps) {
 				bgAlt: "#fafafa",
 				text: "#111111",
 				subtle: "#555555",
+				pin: "#ef4444",
+				pinBorder: "#ffffff",
 			};
+
+	// Create a custom pin element for the marker
+	const createMarkerEl = useCallback(() => {
+		const el = document.createElement("div");
+		el.style.width = "18px";
+		el.style.height = "18px";
+		el.style.borderRadius = "50%";
+		el.style.background = ui.pin;
+		el.style.border = `2px solid ${ui.pinBorder}`;
+		el.style.boxShadow = prefersDark
+			? "0 1px 2px rgba(0,0,0,0.6)"
+			: "0 1px 2px rgba(0,0,0,0.3)";
+		el.style.position = "relative";
+		el.style.transform = "translate(-50%, -100%)";
+		el.style.cursor = "default";
+		el.setAttribute("aria-hidden", "true");
+
+		// Tail to make it feel like a pin
+		const tail = document.createElement("div");
+		tail.style.position = "absolute";
+		tail.style.bottom = "-6px";
+		tail.style.left = "50%";
+		tail.style.width = "2px";
+		tail.style.height = "8px";
+		tail.style.transform = "translateX(-50%)";
+		tail.style.background = ui.pin;
+		tail.style.borderRadius = "1px";
+		el.appendChild(tail);
+
+		return el;
+	}, [ui.pin, ui.pinBorder, prefersDark]);
 
 	useEffect(() => {
 		// Dynamically import mapbox-gl only in the browser
@@ -109,7 +144,8 @@ export default function MapPointField(props: AdminFieldProps) {
 		const updateMarker = (lng: number, lat: number) => {
 			if (!mapRef.current || !mapboxgl) return;
 			if (!markerRef.current) {
-				markerRef.current = new mapboxgl.Marker({ draggable: false });
+				const el = createMarkerEl();
+				markerRef.current = new mapboxgl.Marker({ element: el, draggable: false, anchor: "bottom" as any });
 			}
 			markerRef.current.setLngLat([lng, lat]).addTo(mapRef.current);
 		};
@@ -129,7 +165,7 @@ export default function MapPointField(props: AdminFieldProps) {
 			mapRef.current = null;
 			markerRef.current = null;
 		};
-	}, [mapboxgl, accessToken]);
+	}, [mapboxgl, accessToken, createMarkerEl]);
 
 	// Update map style when theme changes
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
@@ -143,16 +179,36 @@ export default function MapPointField(props: AdminFieldProps) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [prefersDark]);
 
+	// Keep the marker theme in sync on theme changes
+	useEffect(() => {
+		if (!markerRef.current) return;
+		const el = markerRef.current.getElement?.() as HTMLElement | undefined;
+		if (!el) return;
+		el.style.background = ui.pin;
+		el.style.border = `2px solid ${ui.pinBorder}`;
+		const tail = el.lastElementChild as HTMLElement | null;
+		if (tail) {
+			tail.style.background = ui.pin;
+		}
+	}, [ui.pin, ui.pinBorder]);
+
 	useEffect(() => {
 		// Keep marker in sync if value changes externally
 		if (!mapRef.current || !mapboxgl || !accessToken) return;
 		if (value && Array.isArray(value) && value.length === 2) {
 			if (!markerRef.current) {
-				markerRef.current = new mapboxgl.Marker({ draggable: false });
+				const el = createMarkerEl();
+				markerRef.current = new mapboxgl.Marker({ element: el, draggable: false, anchor: "bottom" as any });
 			}
 			markerRef.current.setLngLat(value);
+		} else {
+			// Remove marker when value cleared
+			if (markerRef.current) {
+				markerRef.current.remove();
+				markerRef.current = null;
+			}
 		}
-	}, [value, mapboxgl, accessToken]);
+	}, [value, mapboxgl, accessToken, createMarkerEl]);
 
 	const geocode = useCallback(async (): Promise<void> => {
 		const provider = options?.geocoder?.provider;
