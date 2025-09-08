@@ -1,6 +1,6 @@
 {
   "name": "@limeyfy/payload-plugin-map-point",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Payload plugin to enhance point fields with a Mapbox map UI and optional geocoding.",
   "license": "MIT",
   "type": "module",
