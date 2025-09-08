@@ -1,54 +1,51 @@
-name: Release on main
+name: Publish on main
 
 on:
   push:
     branches: [ main ]
-
-concurrency:
-  group: release-main
-  cancel-in-progress: false
 
 permissions:
   contents: write
   packages: write
 
 jobs:
-  release:
+  publish:
     runs-on: ubuntu-latest
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.14
+          version: 9
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
           registry-url: https://registry.npmjs.org
           scope: '@limeyfy'
           always-auth: true
-          cache: pnpm
 
-      - name: Install deps
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Configure npm auth
-        if: env.NODE_AUTH_TOKEN != ''
-        run: |
-          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
-          echo "always-auth=true" >> ~/.npmrc
-          npm whoami || true
+      - name: Build
+        run: pnpm run build
 
-      - name: Ensure unique version (bump patch if exists)
-        id: ensure_version
-        env:
-          PACKAGE_NAME: ${{ github.event.repository.name }}
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Ensure unique version (bump patch if published)
+        id: version
         run: |
           node - <<'NODE'
           const fs = require('fs');
@@ -65,44 +62,56 @@ jobs:
           }
           const exists = Array.isArray(published) && published.includes(current);
           let next = current;
-          let bumped = false;
           if (exists) {
             cp.execSync('npm version patch --no-git-tag-version', { stdio: 'inherit' });
             next = JSON.parse(fs.readFileSync('package.json','utf8')).version;
-            bumped = true;
             console.log(`Bumped version to ${next}`);
+            cp.execSync(`git add package.json`, { stdio: 'inherit' });
+            cp.execSync(`git commit -m "chore(release): bump version to ${next}"`, { stdio: 'inherit' });
+            cp.execSync(`git push origin HEAD:main`, { stdio: 'inherit' });
           } else {
             console.log(`Using version ${current}`);
           }
-          const outFile = process.env.GITHUB_OUTPUT;
-          if (outFile) {
-            fs.appendFileSync(outFile, `version=${next}\n`);
-            fs.appendFileSync(outFile, `bumped=${String(bumped)}\n`);
-          }
+          const out = process.env.GITHUB_OUTPUT;
+          if (out) fs.appendFileSync(out, `version=${next}\n`);
           NODE
 
-      - name: Commit version bump
-        if: steps.ensure_version.outputs.bumped == 'true'
+      - name: Create tag
         run: |
-          git add package.json
-          git commit -m "chore(release): bump version to ${{ steps.ensure_version.outputs.version }}"
-          git push
-          
-      - name: Commit version bump
-        run: |
-          git add package.json
-          git commit -m "chore: bump version [skip ci]" || echo "No changes to commit"
-          git push origin main
+          VERSION=${{ steps.version.outputs.version }}
+          if [ -z "$VERSION" ]; then VERSION=$(node -p "require('./package.json').version"); fi
+          echo "Tagging v$VERSION"
+          git tag -a "v$VERSION" -m "v$VERSION" || echo "Tag exists"
+          git push origin "v$VERSION" || echo "Tag push skipped"
 
-      - name: Git user
+      - name: Configure npm auth (npmjs)
+        if: env.NODE_AUTH_TOKEN != ''
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+          echo "always-auth=true" >> ~/.npmrc
+          npm whoami || true
 
-      - name: Release (tag, GitHub Release, npm publish)
+      - name: Publish to npm (public)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          pnpm run build
-          pnpm release -- --ci from-package
+          npm publish --access public
+
+      - name: Publish to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "@limeyfy:registry=https://npm.pkg.github.com" >> ~/.npmrc
+          echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
+          npm publish --registry=https://npm.pkg.github.com
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
