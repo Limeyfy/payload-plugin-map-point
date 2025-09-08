@@ -68,8 +68,6 @@ jobs:
     name: Build and publish
     needs: prepare
     runs-on: ubuntu-latest
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout (latest main)
         uses: actions/checkout@v4
@@ -105,25 +103,23 @@ jobs:
           git push origin "v$VERSION" || echo "Tag push skipped"
 
       - name: Configure npm auth (npmjs)
-        if: env.NODE_AUTH_TOKEN != ''
+        if: ${{ secrets.NPM_TOKEN != '' }}
         run: |
-          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
           echo "always-auth=true" >> ~/.npmrc
           npm whoami || true
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm (public)
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          VERSION=${{ needs.prepare.outputs.version }}
+          NAME=$(node -p "require('./package.json').name")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "Version $NAME@$VERSION already exists on npm. Skipping publish."
+            exit 0
+          fi
           npm publish --access public
-
-      - name: Publish to GitHub Packages
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "@limeyfy:registry=https://npm.pkg.github.com" >> ~/.npmrc
-          echo "//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}" >> ~/.npmrc
-          npm publish --registry=https://npm.pkg.github.com
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
