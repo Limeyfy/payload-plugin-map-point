@@ -47,7 +47,7 @@ export default function MapPointField(props: AdminFieldProps) {
 				};
 
 	useEffect(() => {
-		mapboxgl.accessToken = "CHANGE";
+		mapboxgl.accessToken = apiKey || envPublicKey;
 
 		if (mapContainer.current) {
 			const map = new mapboxgl.Map({
