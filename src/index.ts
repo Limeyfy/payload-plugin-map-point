@@ -177,8 +177,11 @@ export const mapPointPlugin: (options?: MapPointPluginOptions) => Plugin =
 			// ignore, fallback to import map generator resolving the package subpath
 		}
 
-		config.custom.mapPointPluginOptions = {
-			publicMapKey: options?.geocoder?.apiKey,
+		config.custom = {
+			...(config.custom || {}),
+			mapPointPluginOptions: {
+				publicMapKey: options?.geocoder?.apiKey,
+			},
 		};
 
 		return config;
