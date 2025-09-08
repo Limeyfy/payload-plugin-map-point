@@ -1,214 +1,75 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-	Map as MapboxMap,
-	Marker as MapboxMarker,
-	MapMouseEvent,
-} from "mapbox-gl";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 import type { AdminFieldProps } from "./types";
+import { useConfig, useTheme } from "@payloadcms/ui";
 
 const defaultCenter: [number, number] = [0, 0];
 const defaultZoom = 1;
 
 export default function MapPointField(props: AdminFieldProps) {
-  const { value, onChange, field } = props;
+	const { value, onChange, field } = props;
 	const options = field?.admin?.mapPoint || {};
+	const { theme } = useTheme();
+	const { config } = useConfig();
 
-	const containerRef = useRef<HTMLDivElement | null>(null);
-	const mapRef = useRef<MapboxMap | null>(null);
-	const markerRef = useRef<MapboxMarker | null>(null);
+	const mapContainer = useRef<HTMLDivElement>(null);
 
-	type MapboxModule = {
-		Map: new (options: unknown) => MapboxMap;
-		Marker: new (options?: unknown) => MapboxMarker;
-		accessToken: string;
-	};
-	const [mapboxgl, setMapbox] = useState<MapboxModule | null>(null);
 	const [query, setQuery] = useState("");
+	const containerRef = useRef<HTMLDivElement | null>(null);
+	const [coords, setCoords] = useState<[number, number] | null>(null); // [lng, lat]
 
-	// Detect system/admin dark mode to switch map styles + UI colors
-	const [prefersDark, setPrefersDark] = useState<boolean>(() =>
-		typeof window !== "undefined"
-			? window.matchMedia &&
-				window.matchMedia("(prefers-color-scheme: dark)").matches
-			: false,
-	);
+	const apiKey = config.custom?.mapPointPluginOptions?.publicMapKey as
+		| string
+		| undefined;
+
+	const mapStyleURL =
+		theme === "dark"
+			? "mapbox://styles/mapbox/dark-v11"
+			: "mapbox://styles/mapbox/streets-v12";
+
+	const ui =
+		theme === "dark"
+			? {
+					border: "#374151",
+					bg: "#111827",
+					bgAlt: "#1f2937",
+					text: "#e5e7eb",
+					subtle: "#9ca3af",
+					pin: "#ef4444",
+					pinBorder: "#111827",
+				}
+			: {
+					border: "#cccccc",
+					bg: "#ffffff",
+					bgAlt: "#fafafa",
+					text: "#111111",
+					subtle: "#555555",
+					pin: "#ef4444",
+					pinBorder: "#ffffff",
+				};
 
 	useEffect(() => {
-		if (typeof window === "undefined" || !window.matchMedia) return;
-		const mql = window.matchMedia("(prefers-color-scheme: dark)");
-		const handler = (e: MediaQueryListEvent) => setPrefersDark(e.matches);
-		if (mql.addEventListener) mql.addEventListener("change", handler);
-		else mql.addListener(handler);
-		return () => {
-			if (mql.removeEventListener) mql.removeEventListener("change", handler);
-			else mql.removeListener(handler);
-		};
-	}, []);
+		mapboxgl.accessToken = "CHANGE";
 
-	const center = useMemo(
-		() => value ?? options.defaultCenter ?? defaultCenter,
-		[value, options.defaultCenter],
-	);
-	const zoom = useMemo(
-		() => (value ? 12 : (options.defaultZoom ?? defaultZoom)),
-		[value, options.defaultZoom],
-	);
+		if (mapContainer.current) {
+			const map = new mapboxgl.Map({
+				container: mapContainer.current,
+				style: "mapbox://styles/mapbox/outdoors-v12",
+				center: coords || [60.656576, 11.907293],
+				zoom: 14,
+				maxZoom: 16,
+				minZoom: 10,
+			});
 
-	const mapStyleURL = prefersDark
-		? "mapbox://styles/mapbox/dark-v11"
-		: "mapbox://styles/mapbox/streets-v12";
-
-	const ui = prefersDark
-		? {
-				border: "#374151",
-				bg: "#111827",
-				bgAlt: "#1f2937",
-				text: "#e5e7eb",
-				subtle: "#9ca3af",
-				pin: "#ef4444",
-				pinBorder: "#111827",
+			map.addControl(new mapboxgl.NavigationControl(), "top-left");
+			if (coords) {
+				new mapboxgl.Marker().setLngLat(coords).addTo(map);
 			}
-		: {
-				border: "#cccccc",
-				bg: "#ffffff",
-				bgAlt: "#fafafa",
-				text: "#111111",
-				subtle: "#555555",
-				pin: "#ef4444",
-				pinBorder: "#ffffff",
-			};
 
-	// Create a custom pin element for the marker
-	const createMarkerEl = useCallback(() => {
-		const el = document.createElement("div");
-		el.style.width = "18px";
-		el.style.height = "18px";
-		el.style.borderRadius = "50%";
-		el.style.background = ui.pin;
-		el.style.border = `2px solid ${ui.pinBorder}`;
-		el.style.boxShadow = prefersDark
-			? "0 1px 2px rgba(0,0,0,0.6)"
-			: "0 1px 2px rgba(0,0,0,0.3)";
-		el.style.position = "relative";
-		el.style.transform = "translate(-50%, -100%)";
-		el.style.cursor = "default";
-		el.setAttribute("aria-hidden", "true");
-
-		// Tail to make it feel like a pin
-		const tail = document.createElement("div");
-		tail.style.position = "absolute";
-		tail.style.bottom = "-6px";
-		tail.style.left = "50%";
-		tail.style.width = "2px";
-		tail.style.height = "8px";
-		tail.style.transform = "translateX(-50%)";
-		tail.style.background = ui.pin;
-		tail.style.borderRadius = "1px";
-		el.appendChild(tail);
-
-		return el;
-	}, [ui.pin, ui.pinBorder, prefersDark]);
-
-	useEffect(() => {
-		// Dynamically import mapbox-gl only in the browser
-		let mounted = true;
-		import("mapbox-gl").then((m) => {
-			if (!mounted) return;
-			const mod = m as unknown as { default?: MapboxModule } & MapboxModule;
-			setMapbox(mod.default ?? (mod as unknown as MapboxModule));
-		});
-		return () => {
-			mounted = false;
-		};
-	}, []);
-
-	const accessToken = options?.geocoder?.apiKey;
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-	useEffect(() => {
-		if (!mapboxgl) return;
-		if (!containerRef.current) return;
-		if (!accessToken) return;
-
-		mapboxgl.accessToken = accessToken;
-
-		const map = new mapboxgl.Map({
-			container: containerRef.current,
-			style: mapStyleURL,
-			center: center ?? defaultCenter,
-			zoom: zoom ?? defaultZoom,
-			attributionControl: true,
-		});
-		mapRef.current = map;
-
-		const updateMarker = (lng: number, lat: number) => {
-			if (!mapRef.current || !mapboxgl) return;
-			if (!markerRef.current) {
-				const el = createMarkerEl();
-				markerRef.current = new mapboxgl.Marker({ element: el, draggable: false, anchor: "bottom" as any });
-			}
-			markerRef.current.setLngLat([lng, lat]).addTo(mapRef.current);
-		};
-
-		if (value && Array.isArray(value) && value.length === 2) {
-			updateMarker(value[0], value[1]);
+			return () => map.remove();
 		}
-
-		map.on("click", (e: MapMouseEvent) => {
-			const { lng, lat } = e.lngLat;
-			updateMarker(lng, lat);
-			if (typeof onChange === "function") onChange([lng, lat]);
-		});
-
-		return () => {
-			map.remove();
-			mapRef.current = null;
-			markerRef.current = null;
-		};
-	}, [mapboxgl, accessToken, createMarkerEl]);
-
-	// Update map style when theme changes
-	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-	useEffect(() => {
-		if (!mapRef.current || !mapboxgl || !accessToken) return;
-		try {
-			mapRef.current.setStyle(mapStyleURL);
-		} catch {
-			// ignore style changes if map not ready
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [prefersDark]);
-
-	// Keep the marker theme in sync on theme changes
-	useEffect(() => {
-		if (!markerRef.current) return;
-		const el = markerRef.current.getElement?.() as HTMLElement | undefined;
-		if (!el) return;
-		el.style.background = ui.pin;
-		el.style.border = `2px solid ${ui.pinBorder}`;
-		const tail = el.lastElementChild as HTMLElement | null;
-		if (tail) {
-			tail.style.background = ui.pin;
-		}
-	}, [ui.pin, ui.pinBorder]);
-
-	useEffect(() => {
-		// Keep marker in sync if value changes externally
-		if (!mapRef.current || !mapboxgl || !accessToken) return;
-		if (value && Array.isArray(value) && value.length === 2) {
-			if (!markerRef.current) {
-				const el = createMarkerEl();
-				markerRef.current = new mapboxgl.Marker({ element: el, draggable: false, anchor: "bottom" as any });
-			}
-			markerRef.current.setLngLat(value);
-		} else {
-			// Remove marker when value cleared
-			if (markerRef.current) {
-				markerRef.current.remove();
-				markerRef.current = null;
-			}
-		}
-	}, [value, mapboxgl, accessToken, createMarkerEl]);
+	}, [coords]);
 
 	const geocode = useCallback(async (): Promise<void> => {
 		const provider = options?.geocoder?.provider;
@@ -246,8 +107,8 @@ export default function MapPointField(props: AdminFieldProps) {
 				}
 			}
 
-			if (lng != null && lat != null && mapRef.current) {
-				mapRef.current.flyTo({ center: [lng, lat], zoom: 14 });
+			if (lng != null && lat != null) {
+				setCoords([lng, lat]);
 				if (typeof onChange === "function") onChange([lng, lat]);
 			}
 		} catch (e) {
@@ -294,7 +155,7 @@ export default function MapPointField(props: AdminFieldProps) {
 				</div>
 			)}
 
-			{!accessToken ? (
+			{!apiKey ? (
 				<div
 					style={{
 						width: "100%",
@@ -312,7 +173,7 @@ export default function MapPointField(props: AdminFieldProps) {
 				</div>
 			) : (
 				<div
-					ref={containerRef}
+					ref={mapContainer}
 					style={{
 						width: "100%",
 						height: 320,
