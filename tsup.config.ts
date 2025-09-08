@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  entry: ['src/index.ts', 'src/admin/MapPointField.tsx'],
+  entry: ['src/index.ts', 'src/admin/MapPointField.tsx', 'src/admin/ClientMapPointField.tsx'],
   format: ['esm', 'cjs'],
   dts: true,
   sourcemap: true,

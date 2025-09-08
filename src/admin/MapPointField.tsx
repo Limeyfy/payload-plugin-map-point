@@ -1,47 +1,49 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-type PointValue = [number, number] | null;
-
-type MapPointAdminOptions = {
-	defaultCenter?: [number, number];
-	defaultZoom?: number;
-	geocoder?: {
-		provider?: "mapbox" | "nominatim";
-		apiKey?: string;
-		placeholder?: string;
-	};
-};
-
-type FieldLike = {
-	name: string;
-	label?: string;
-	admin?: {
-		readOnly?: boolean;
-		mapPoint?: MapPointAdminOptions;
-	};
-};
-
-// Loose typing based on Payload custom field component props to avoid importing admin types
-type Props = {
-	path: string;
-	field: FieldLike;
-	value: PointValue;
-	onChange: (val: PointValue) => void;
-};
+import type {
+	Map as MapboxMap,
+	Marker as MapboxMarker,
+	MapMouseEvent,
+} from "mapbox-gl";
+import type { AdminFieldProps } from "./types";
 
 const defaultCenter: [number, number] = [0, 0];
 const defaultZoom = 1;
 
-export default function MapPointField(props: Props) {
-	const { value, onChange, field } = props;
-	const options: MapPointAdminOptions = field?.admin?.mapPoint || {};
+export default function MapPointField(props: AdminFieldProps) {
+  const { value, onChange, field } = props;
+	const options = field?.admin?.mapPoint || {};
 
 	const containerRef = useRef<HTMLDivElement | null>(null);
-	const mapRef = useRef<any>(null);
-	const markerRef = useRef<any>(null);
+	const mapRef = useRef<MapboxMap | null>(null);
+	const markerRef = useRef<MapboxMarker | null>(null);
 
-	const [mapboxgl, setMapbox] = useState<any>(null);
+	type MapboxModule = {
+		Map: new (options: unknown) => MapboxMap;
+		Marker: new (options?: unknown) => MapboxMarker;
+		accessToken: string;
+	};
+	const [mapboxgl, setMapbox] = useState<MapboxModule | null>(null);
 	const [query, setQuery] = useState("");
+
+	// Detect system/admin dark mode to switch map styles + UI colors
+	const [prefersDark, setPrefersDark] = useState<boolean>(() =>
+		typeof window !== "undefined"
+			? window.matchMedia &&
+				window.matchMedia("(prefers-color-scheme: dark)").matches
+			: false,
+	);
+
+	useEffect(() => {
+		if (typeof window === "undefined" || !window.matchMedia) return;
+		const mql = window.matchMedia("(prefers-color-scheme: dark)");
+		const handler = (e: MediaQueryListEvent) => setPrefersDark(e.matches);
+		if (mql.addEventListener) mql.addEventListener("change", handler);
+		else mql.addListener(handler);
+		return () => {
+			if (mql.removeEventListener) mql.removeEventListener("change", handler);
+			else mql.removeListener(handler);
+		};
+	}, []);
 
 	const center = useMemo(
 		() => value ?? options.defaultCenter ?? defaultCenter,
@@ -52,12 +54,33 @@ export default function MapPointField(props: Props) {
 		[value, options.defaultZoom],
 	);
 
+	const mapStyleURL = prefersDark
+		? "mapbox://styles/mapbox/dark-v11"
+		: "mapbox://styles/mapbox/streets-v12";
+
+	const ui = prefersDark
+		? {
+				border: "#374151",
+				bg: "#111827",
+				bgAlt: "#1f2937",
+				text: "#e5e7eb",
+				subtle: "#9ca3af",
+			}
+		: {
+				border: "#cccccc",
+				bg: "#ffffff",
+				bgAlt: "#fafafa",
+				text: "#111111",
+				subtle: "#555555",
+			};
+
 	useEffect(() => {
 		// Dynamically import mapbox-gl only in the browser
 		let mounted = true;
 		import("mapbox-gl").then((m) => {
 			if (!mounted) return;
-			setMapbox((m as any).default ?? (m as any));
+			const mod = m as unknown as { default?: MapboxModule } & MapboxModule;
+			setMapbox(mod.default ?? (mod as unknown as MapboxModule));
 		});
 		return () => {
 			mounted = false;
@@ -72,11 +95,11 @@ export default function MapPointField(props: Props) {
 		if (!containerRef.current) return;
 		if (!accessToken) return;
 
-		(mapboxgl as any).accessToken = accessToken;
+		mapboxgl.accessToken = accessToken;
 
 		const map = new mapboxgl.Map({
 			container: containerRef.current,
-			style: "mapbox://styles/mapbox/streets-v12",
+			style: mapStyleURL,
 			center: center ?? defaultCenter,
 			zoom: zoom ?? defaultZoom,
 			attributionControl: true,
@@ -95,11 +118,11 @@ export default function MapPointField(props: Props) {
 			updateMarker(value[0], value[1]);
 		}
 
-		map.on("click", (e: any) => {
-			const { lng, lat } = e.lngLat;
-			updateMarker(lng, lat);
-			onChange([lng, lat]);
-		});
+    map.on("click", (e: MapMouseEvent) => {
+      const { lng, lat } = e.lngLat;
+      updateMarker(lng, lat);
+      if (typeof onChange === "function") onChange([lng, lat]);
+    });
 
 		return () => {
 			map.remove();
@@ -107,6 +130,17 @@ export default function MapPointField(props: Props) {
 			markerRef.current = null;
 		};
 	}, [mapboxgl, accessToken]);
+
+	// Update map style when theme changes
+	useEffect(() => {
+		if (!mapRef.current || !mapboxgl || !accessToken) return;
+		try {
+			mapRef.current.setStyle(mapStyleURL);
+		} catch {
+			// ignore style changes if map not ready
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [prefersDark]);
 
 	useEffect(() => {
 		// Keep marker in sync if value changes externally
@@ -119,7 +153,7 @@ export default function MapPointField(props: Props) {
 		}
 	}, [value, mapboxgl, accessToken]);
 
-	const geocode = useCallback(async () => {
+  const geocode = useCallback(async (): Promise<void> => {
 		const provider = options?.geocoder?.provider;
 		const apiKey = options?.geocoder?.apiKey;
 		const q = query.trim();
@@ -132,7 +166,8 @@ export default function MapPointField(props: Props) {
 				if (!apiKey) return;
 				const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${apiKey}`;
 				const res = await fetch(url);
-				const data = await res.json();
+				const data: { features?: Array<{ center?: [number, number] }> } =
+					await res.json();
 				const center = data?.features?.[0]?.center;
 				if (Array.isArray(center) && center.length >= 2) {
 					lng = Number(center[0]);
@@ -145,7 +180,8 @@ export default function MapPointField(props: Props) {
 						"Accept-Language": "en",
 					},
 				});
-				const data = await res.json();
+				const data: Array<{ lon?: string | number; lat?: string | number }> =
+					await res.json();
 				const item = data?.[0];
 				if (item?.lon && item?.lat) {
 					lng = Number(item.lon);
@@ -153,10 +189,10 @@ export default function MapPointField(props: Props) {
 				}
 			}
 
-			if (lng != null && lat != null && mapRef.current) {
-				mapRef.current.flyTo({ center: [lng, lat], zoom: 14 });
-				onChange([lng, lat]);
-			}
+      if (lng != null && lat != null && mapRef.current) {
+        mapRef.current.flyTo({ center: [lng, lat], zoom: 14 });
+        if (typeof onChange === "function") onChange([lng, lat]);
+      }
 		} catch (e) {
 			// eslint-disable-next-line no-console
 			console.warn("Geocoding failed", e);
@@ -175,12 +211,26 @@ export default function MapPointField(props: Props) {
 							if (e.key === "Enter") geocode();
 						}}
 						placeholder={options?.geocoder?.placeholder || "Search location"}
-						style={{ flex: 1, padding: 8 }}
+						style={{
+							flex: 1,
+							padding: 8,
+							background: ui.bg,
+							color: ui.text,
+							border: `1px solid ${ui.border}`,
+							borderRadius: 6,
+						}}
 					/>
 					<button
 						type="button"
 						onClick={geocode}
-						style={{ padding: "8px 12px" }}
+						style={{
+							padding: "8px 12px",
+							background: ui.bgAlt,
+							color: ui.text,
+							border: `1px solid ${ui.border}`,
+							borderRadius: 6,
+							cursor: "pointer",
+						}}
 					>
 						Search
 					</button>
@@ -193,12 +243,12 @@ export default function MapPointField(props: Props) {
 						width: "100%",
 						height: 320,
 						borderRadius: 6,
-						border: "1px dashed #ccc",
+						border: `1px dashed ${ui.border}`,
 						display: "flex",
 						alignItems: "center",
 						justifyContent: "center",
-						color: "#666",
-						background: "#fafafa",
+						color: ui.subtle,
+						background: ui.bgAlt,
 					}}
 				>
 					Mapbox access token required to render map.
@@ -211,13 +261,13 @@ export default function MapPointField(props: Props) {
 						height: 320,
 						borderRadius: 6,
 						overflow: "hidden",
-						border: "1px solid #ccc",
+						border: `1px solid ${ui.border}`,
 					}}
 				/>
 			)}
 
 			<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-				<small style={{ opacity: 0.8 }}>
+				<small style={{ opacity: 0.9, color: ui.subtle }}>
 					{value
 						? `Lng, Lat: ${value[0].toFixed(6)}, ${value[1].toFixed(6)}`
 						: "Click the map to set a point"}
@@ -225,8 +275,16 @@ export default function MapPointField(props: Props) {
 				{value && (
 					<button
 						type="button"
-						onClick={() => onChange(null)}
-						style={{ marginLeft: "auto", padding: "6px 10px" }}
+            onClick={() => typeof onChange === "function" && onChange(null)}
+						style={{
+							marginLeft: "auto",
+							padding: "6px 10px",
+							background: ui.bgAlt,
+							color: ui.text,
+							border: `1px solid ${ui.border}`,
+							borderRadius: 6,
+							cursor: "pointer",
+						}}
 					>
 						Clear
 					</button>

@@ -1,6 +1,6 @@
 {
   "name": "@limeyfy/payload-plugin-map-point",
-  "version": "1.0.3",
+  "version": "1.0.7",
   "description": "Payload plugin to enhance point fields with a Mapbox map UI and optional geocoding.",
   "license": "MIT",
   "type": "module",
@@ -17,6 +17,11 @@
       "types": "./dist/admin/MapPointField.d.ts",
       "import": "./dist/admin/MapPointField.js",
       "require": "./dist/admin/MapPointField.cjs.js"
+    },
+    "./admin/ClientMapPointField": {
+      "types": "./dist/admin/ClientMapPointField.d.ts",
+      "import": "./dist/admin/ClientMapPointField.js",
+      "require": "./dist/admin/ClientMapPointField.cjs.js"
     }
   },
   "files": [
