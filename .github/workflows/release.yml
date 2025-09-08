@@ -9,15 +9,73 @@ permissions:
   packages: write
 
 jobs:
-  publish:
+  prepare:
+    name: Prepare version
     runs-on: ubuntu-latest
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    outputs:
+      version: ${{ steps.ensure.outputs.version }}
+      bumped: ${{ steps.ensure.outputs.bumped }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Ensure unique version (bump patch if published)
+        id: ensure
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const cp = require('child_process');
+          const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
+          const name = pkg.name;
+          const current = pkg.version;
+          let published = [];
+          try {
+            const out = cp.execSync(`npm view ${name} versions --json`, { encoding: 'utf8' }).trim();
+            published = JSON.parse(out || '[]');
+          } catch (e) {}
+          const exists = Array.isArray(published) && published.includes(current);
+          let next = current;
+          let bumped = false;
+          if (exists) {
+            cp.execSync('npm version patch --no-git-tag-version', { stdio: 'inherit' });
+            next = JSON.parse(fs.readFileSync('package.json','utf8')).version;
+            bumped = true;
+            cp.execSync('git add package.json', { stdio: 'inherit' });
+            cp.execSync(`git commit -m "chore(release): bump version to ${next}"`, { stdio: 'inherit' });
+            cp.execSync('git push origin HEAD:main', { stdio: 'inherit' });
+          }
+          const outFile = process.env.GITHUB_OUTPUT;
+          if (outFile) {
+            fs.appendFileSync(outFile, `version=${next}\n`);
+            fs.appendFileSync(outFile, `bumped=${String(bumped)}\n`);
+          }
+          NODE
+
+  publish:
+    name: Build and publish
+    needs: prepare
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - name: Checkout (latest main)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -39,47 +97,9 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Configure Git user
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Ensure unique version (bump patch if published)
-        id: version
-        run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const cp = require('child_process');
-          const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
-          const name = pkg.name;
-          const current = pkg.version;
-          let published = [];
-          try {
-            const out = cp.execSync(`npm view ${name} versions --json`, { encoding: 'utf8' }).trim();
-            published = JSON.parse(out || '[]');
-          } catch (e) {
-            // package may not exist yet; continue
-          }
-          const exists = Array.isArray(published) && published.includes(current);
-          let next = current;
-          if (exists) {
-            cp.execSync('npm version patch --no-git-tag-version', { stdio: 'inherit' });
-            next = JSON.parse(fs.readFileSync('package.json','utf8')).version;
-            console.log(`Bumped version to ${next}`);
-            cp.execSync(`git add package.json`, { stdio: 'inherit' });
-            cp.execSync(`git commit -m "chore(release): bump version to ${next}"`, { stdio: 'inherit' });
-            cp.execSync(`git push origin HEAD:main`, { stdio: 'inherit' });
-          } else {
-            console.log(`Using version ${current}`);
-          }
-          const out = process.env.GITHUB_OUTPUT;
-          if (out) fs.appendFileSync(out, `version=${next}\n`);
-          NODE
-
       - name: Create tag
         run: |
-          VERSION=${{ steps.version.outputs.version }}
-          if [ -z "$VERSION" ]; then VERSION=$(node -p "require('./package.json').version"); fi
+          VERSION=${{ needs.prepare.outputs.version }}
           echo "Tagging v$VERSION"
           git tag -a "v$VERSION" -m "v$VERSION" || echo "Tag exists"
           git push origin "v$VERSION" || echo "Tag push skipped"
@@ -108,10 +128,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: v${{ steps.version.outputs.version }}
+          tag_name: v${{ needs.prepare.outputs.version }}
+          name: v${{ needs.prepare.outputs.version }}
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
