@@ -15,6 +15,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,16 +31,19 @@ jobs:
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
+          scope: '@limeyfy'
+          always-auth: true
           cache: pnpm
 
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
       - name: Configure npm auth
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        if: env.NODE_AUTH_TOKEN != ''
         run: |
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
+          echo "always-auth=true" >> ~/.npmrc
+          npm whoami || true
 
       - name: Ensure unique version (bump patch if exists)
         id: ensure_version
@@ -77,8 +82,7 @@ jobs:
       - name: Release (tag, GitHub Release, npm publish)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           pnpm run build
           pnpm release -- --ci from-package
-
