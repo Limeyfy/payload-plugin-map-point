@@ -73,6 +73,12 @@ jobs:
             console.log(`version=${current}`);
           }
           NODE
+          
+      - name: Commit version bump
+        run: |
+          git add package.json
+          git commit -m "chore: bump version [skip ci]" || echo "No changes to commit"
+          git push origin main
 
       - name: Git user
         run: |
