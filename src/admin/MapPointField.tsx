@@ -53,8 +53,8 @@ export default function MapPointField(props: AdminFieldProps) {
 			const map = new mapboxgl.Map({
 				container: mapContainer.current,
 				style: mapStyleURL,
-				center: coords || [60.656576, 11.907293],
-				zoom: 13,
+				center: coords || [60.6, 11.9],
+				zoom: 12,
 				maxZoom: 16,
 				minZoom: 10,
 			});
@@ -66,7 +66,7 @@ export default function MapPointField(props: AdminFieldProps) {
 
 			return () => map.remove();
 		}
-	}, [coords, mapStyleURL, envPublicKey]);
+	}, [coords, mapStyleURL, apiKey]);
 
 	const geocode = useCallback(async (): Promise<void> => {
 		const provider = options?.geocoder?.provider;
