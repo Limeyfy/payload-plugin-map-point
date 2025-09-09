@@ -30,3 +30,5 @@ export type ClientComponentsProps = {
 export const ClientMapPointField = (props: CustomPointFieldClientProps) => {
 	return <MapPointField {...props} />;
 };
+
+export default ClientMapPointField;
