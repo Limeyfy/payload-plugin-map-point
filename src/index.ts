@@ -1,41 +1,17 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Plugin } from "payload";
-import type { MapPointPluginOptions } from "./types";
+import type { Field, Plugin, PointField } from "payload";
+import { getConfig } from "./admin/config";
 import { envPublicKey } from "./token";
+import type { MapPointField, MapPointPluginOptions } from "./types";
 
 // ---------------------------------------------
 // Types & helpers for recursively enhancing fields
 // ---------------------------------------------
 
-type AdminComponents = { Field?: string };
-
-type AdminConfig = {
-	components?: AdminComponents;
-	mapPoint?: MapPointPluginOptions;
-};
-
-type PointField = {
-	type: "point";
-	name: string;
-	admin?: AdminConfig;
-};
-
 type FieldsContainer = { fields: Field[] };
-
-type BlocksContainer = { blocks: Array<{ fields: Field[] }> };
-
-type TabsContainer = { tabs: Array<{ fields: Field[] }> };
-
-type CompoundField =
-	| ({ type: "group" } & FieldsContainer)
-	| ({ type: "array" } & FieldsContainer)
-	| ({ type: "blocks" } & BlocksContainer)
-	| ({ type: "row" } & FieldsContainer)
-	| ({ type: "tabs" } & TabsContainer);
-
-type OtherField = { type: string; [key: string]: unknown };
-export type Field = PointField | CompoundField | OtherField;
+type BlocksContainer = { blocks: { fields: Field[] }[] };
+type TabsContainer = { tabs: { fields: Field[] }[] };
 
 const isPointField = (field: Field): field is PointField =>
 	field?.type === "point";
@@ -43,43 +19,28 @@ const isPointField = (field: Field): field is PointField =>
 const withMapPointAdmin = (
 	field: PointField,
 	opts?: MapPointPluginOptions,
-): PointField => {
-	// Use package subpath export so Payload's import map can resolve it
-	const adminComponentPath =
-		"@limeyfy/payload-plugin-map-point/admin/ClientMapPointField";
-
-	const admin = field.admin ?? {};
-	const components: AdminComponents = {
-		...(admin.components ?? {}),
-		Field: adminComponentPath,
-	};
-
-	const envApiKey =
-		process.env.NEXT_PUBLIC_MAPBOX_API_KEY ||
-		process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
-		process.env.MAPBOX_PUBLIC_TOKEN ||
-		process.env.MAPBOX_API_KEY ||
-		process.env.MAPBOX_TOKEN;
+): MapPointField => {
+	const admin = (field.admin ?? {}) as MapPointField["admin"];
 
 	// Deep-merge geocoder so we don't lose apiKey when admin provides partial overrides
 	const baseGeocoder = {
 		provider: opts?.geocoder?.provider,
-		apiKey: opts?.geocoder?.apiKey ?? envApiKey,
+		apiKey: opts?.geocoder?.apiKey ?? envPublicKey,
 		placeholder: opts?.geocoder?.placeholder,
 	};
-	const adminGeocoder = (admin.mapPoint as MapPointPluginOptions | undefined)
+	const adminGeocoder = (admin?.mapPoint as MapPointPluginOptions | undefined)
 		?.geocoder;
 
 	const mapPoint: MapPointPluginOptions = {
 		defaultCenter:
-			(admin.mapPoint as MapPointPluginOptions | undefined)?.defaultCenter ??
+			(admin?.mapPoint as MapPointPluginOptions | undefined)?.defaultCenter ??
 			opts?.defaultCenter,
 		defaultZoom:
-			(admin.mapPoint as MapPointPluginOptions | undefined)?.defaultZoom ??
+			(admin?.mapPoint as MapPointPluginOptions | undefined)?.defaultZoom ??
 			opts?.defaultZoom,
 		geocoder: { ...baseGeocoder, ...(adminGeocoder ?? {}) },
 		enabled:
-			(admin.mapPoint as MapPointPluginOptions | undefined)?.enabled ??
+			(admin?.mapPoint as MapPointPluginOptions | undefined)?.enabled ??
 			opts?.enabled,
 	};
 
@@ -87,7 +48,11 @@ const withMapPointAdmin = (
 		...field,
 		admin: {
 			...admin,
-			components,
+			components: getConfig({
+				clientProps: {
+					apiKey: opts?.geocoder?.apiKey || envPublicKey || "",
+				},
+			}),
 			mapPoint,
 		},
 	};
