@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Field, Plugin, PointField } from "payload";
 import { getConfig } from "./admin/config";
-import { envPublicKey } from "./token";
+import { envGoogleKey, envMapboxKey, envPublicKey } from "./token";
 import type { MapPointField, MapPointPluginOptions } from "./types";
 
 // ---------------------------------------------
@@ -24,38 +24,56 @@ const withMapPointAdmin = (
 
 	// Deep-merge geocoder so we don't lose apiKey when admin provides partial overrides
 	const baseGeocoder = {
-		provider: opts?.geocoder?.provider,
-		apiKey: opts?.geocoder?.apiKey ?? envPublicKey,
-		placeholder: opts?.geocoder?.placeholder,
-	};
-	const adminGeocoder = (admin?.mapPoint as MapPointPluginOptions | undefined)
-		?.geocoder;
+    provider: opts?.geocoder?.provider,
+    apiKey: opts?.geocoder?.apiKey ?? envPublicKey,
+    placeholder: opts?.geocoder?.placeholder,
+  };
+  const adminGeocoder = (admin?.mapPoint as MapPointPluginOptions | undefined)
+    ?.geocoder;
 
-	const mapPoint: MapPointPluginOptions = {
+  const mapPoint: MapPointPluginOptions = {
 		defaultCenter:
 			(admin?.mapPoint as MapPointPluginOptions | undefined)?.defaultCenter ??
 			opts?.defaultCenter,
 		defaultZoom:
 			(admin?.mapPoint as MapPointPluginOptions | undefined)?.defaultZoom ??
 			opts?.defaultZoom,
-		geocoder: { ...baseGeocoder, ...(adminGeocoder ?? {}) },
-		enabled:
-			(admin?.mapPoint as MapPointPluginOptions | undefined)?.enabled ??
-			opts?.enabled,
-	};
+    geocoder: { ...baseGeocoder, ...(adminGeocoder ?? {}) },
+    map: {
+      provider:
+        (admin?.mapPoint as MapPointPluginOptions | undefined)?.map?.provider ??
+        opts?.map?.provider ?? "mapbox",
+      apiKey:
+        (admin?.mapPoint as MapPointPluginOptions | undefined)?.map?.apiKey ??
+        opts?.map?.apiKey ??
+        // fallback to geocoder api key or env by provider
+        (opts?.map?.provider === "google"
+          ? opts?.geocoder?.apiKey ?? envGoogleKey
+          : opts?.geocoder?.apiKey ?? envMapboxKey),
+    },
+    enabled:
+      (admin?.mapPoint as MapPointPluginOptions | undefined)?.enabled ??
+      opts?.enabled,
+  };
 
 	return {
 		...field,
 		admin: {
 			...admin,
-			components: getConfig({
-				clientProps: {
-					apiKey: opts?.geocoder?.apiKey || envPublicKey || "",
-				},
-			}),
-			mapPoint,
-		},
-	};
+      components: getConfig({
+        clientProps: {
+          // Back-compat: expose a single apiKey to the client
+          apiKey:
+            opts?.map?.apiKey ||
+            opts?.geocoder?.apiKey ||
+            envMapboxKey ||
+            envGoogleKey ||
+            "",
+        },
+      }),
+      mapPoint,
+    },
+  };
 };
 
 const recurseField = (f: Field, opts?: MapPointPluginOptions): Field => {
@@ -141,27 +159,35 @@ export const mapPointPlugin: (options?: MapPointPluginOptions) => Plugin =
 			}));
 		}
 
-		const publicMapKey = options?.geocoder?.apiKey ?? envPublicKey; // public only!
-		if (!publicMapKey) {
-			console.warn(
-				'[payload-plugin-map-point] No public API key provided in plugin options or env. Mapbox maps and geocoding may not work. Set "geocoder.apiKey" or NEXT_PUBLIC_MAPBOX_TOKEN.',
-			);
-		}
+  const provider = options?.map?.provider ?? "mapbox";
+  const publicMapKey =
+    options?.map?.apiKey || options?.geocoder?.apiKey ||
+    (provider === "google" ? envGoogleKey : envMapboxKey);
+  if ((provider === "mapbox" || provider === "google") && !publicMapKey) {
+    console.warn(
+      `[payload-plugin-map-point] No public API key provided for ${provider} maps. Set map.apiKey or geocoder.apiKey or appropriate env.`,
+    );
+  }
 
 		// Keep existing onInit and warn if provider misconfigured
-		const priorOnInit = incomingConfig.onInit;
-		config.onInit = async (payload: any) => {
-			if (typeof priorOnInit === "function") {
-				await priorOnInit(payload);
-			}
-			const provider = options?.geocoder?.provider;
-			const apiKey = options?.geocoder?.apiKey || envPublicKey;
-			if (provider === "mapbox" && !apiKey) {
-				payload.logger?.warn?.(
-					"[map-point] Mapbox provider enabled but no API key provided",
-				);
-			}
-		};
+  const priorOnInit = incomingConfig.onInit;
+  config.onInit = async (payload: any) => {
+    if (typeof priorOnInit === "function") {
+      await priorOnInit(payload);
+    }
+    const geocoderProvider = options?.geocoder?.provider;
+    const apiKey = options?.geocoder?.apiKey || publicMapKey;
+    if (geocoderProvider === "mapbox" && !apiKey) {
+      payload.logger?.warn?.(
+        "[map-point] Mapbox provider enabled but no API key provided",
+      );
+    }
+    if (geocoderProvider === "google" && !apiKey) {
+      payload.logger?.warn?.(
+        "[map-point] Google geocoder enabled but no API key provided",
+      );
+    }
+  };
 
 		return config;
 	};

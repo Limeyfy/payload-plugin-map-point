@@ -42,10 +42,20 @@
   ],
   "author": "",
   "peerDependencies": {
+    "@googlemaps/js-api-loader": ">=1.16.0",
+    "leaflet": ">=1.9.0",
     "mapbox-gl": ">=3.5.0",
     "payload": "^3.0.0",
     "react": ">=18",
     "react-dom": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "leaflet": {
+      "optional": true
+    },
+    "@googlemaps/js-api-loader": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/mapbox-gl": "^3.4.1",
@@ -58,6 +68,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@payloadcms/ui": "^3.54.0"
+    "@payloadcms/ui": "^3.54.0",
+    "@types/leaflet": "^1.9.20"
   }
 }

@@ -1,10 +1,11 @@
 # Payload-plugin-map-point
 ========================
 
-Enhances Payload CMS `point` fields with an admin Map UI (Mapbox) and an optional search box to geocode an address/place. It preserves the native data format `[lng, lat]` — no breaking changes.
+Enhances Payload CMS `point` fields with an admin Map UI (Mapbox, Google, or Leaflet) and an optional search box to geocode an address/place. It preserves the native data format `[lng, lat]` — no breaking changes.
 
 - Admin map UI: click to set coordinates
-- Optional geocoder: Mapbox (API key) or Nominatim (no key)
+- Map providers: Mapbox, Google, or Leaflet (OSM tiles)
+- Optional geocoder: Mapbox, Google (API key), or Nominatim (no key)
 - Minimal config: default center/zoom + provider/key
 - Zero changes to stored value: stays `[lng, lat]`
 
@@ -18,6 +19,12 @@ Peer dependencies are expected in the host project:
 dev: pnpm add -D @limeyfy/payload-plugin-map-point
 app: pnpm add @limeyfy/payload-plugin-map-point mapbox-gl
 
+# Optional (choose your provider):
+# Google Maps loader (for Google provider)
+app: pnpm add @googlemaps/js-api-loader
+# Leaflet (for Leaflet provider)
+app: pnpm add leaflet
+
 # with npm
 npm i @limeyfy/payload-plugin-map-point mapbox-gl
 
@@ -26,9 +33,9 @@ yarn add @limeyfy/payload-plugin-map-point mapbox-gl
 ```
 
 Notes:
-- `payload`, `react`, and `react-dom` are assumed to be present in your Payload app (peer deps).
-- Map rendering uses Mapbox; a public access token is required to show the map.
-- Geocoding can use Mapbox (requires token) or Nominatim (no token).
+- `payload`, `react`, and `react-dom` are assumed peer deps in your Payload app.
+- Choose a map provider: Mapbox (token), Google (API key), or Leaflet (no key).
+- Geocoding: Mapbox (token), Google (API key), Nominatim (no key).
 
 Quick start
 -----------
@@ -50,6 +57,10 @@ export default buildConfig({
         provider: 'mapbox',
         apiKey: process.env.MAPBOX_TOKEN,
         placeholder: 'Search address',
+      },
+      map: {
+        provider: 'mapbox', // 'google' | 'leaflet'
+        // apiKey: process.env.MAPBOX_TOKEN, // optional (falls back to geocoder.apiKey or env)
       },
     }),
   ],
@@ -83,6 +94,7 @@ You can override the plugin defaults per field using `admin.mapPoint`:
       defaultCenter: [0, 0],
       defaultZoom: 3,
       geocoder: { provider: 'nominatim', placeholder: 'Search city or address' },
+      map: { provider: 'leaflet' },
     },
   },
 }
@@ -96,17 +108,25 @@ mapPointPlugin({
   defaultCenter?: [number, number]   // default map center for empty values
   defaultZoom?: number               // default zoom for empty values
   geocoder?: {
-    provider?: 'mapbox' | 'nominatim' // defaults to 'nominatim' if unset
-    apiKey?: string                   // required for provider: 'mapbox'
-    placeholder?: string              // search input placeholder
+    provider?: 'mapbox' | 'nominatim' | 'google' // defaults to 'nominatim' for Leaflet, otherwise provider
+    apiKey?: string                               // required for 'mapbox' or 'google'
+    placeholder?: string                          // search input placeholder
+  }
+  map?: {
+    provider?: 'mapbox' | 'google' | 'leaflet' // default 'mapbox'
+    apiKey?: string                             // for 'mapbox' or 'google' (falls back to geocoder.apiKey)
   }
 })
 ```
 
-- Map renders with Mapbox; provide a token via `geocoder.apiKey` (or per-field override). Without a token, the UI will show a helpful notice instead of a map.
+- Map rendering:
+  - `mapbox`: requires a public access token.
+  - `google`: requires a public API key. Uses `@googlemaps/js-api-loader` if present, else falls back to injecting the script.
+  - `leaflet`: no key needed; uses OSM tiles by default.
 - Geocoding:
-  - `mapbox`: uses Mapbox Geocoding API (requires token).
-  - `nominatim`: uses OpenStreetMap Nominatim public endpoint (no token). Please respect its usage policy; consider self-hosting or adding appropriate headers for production workloads.
+  - `mapbox`: Mapbox Geocoding API (requires token).
+  - `google`: Google Geocoding API (requires key).
+  - `nominatim`: OpenStreetMap Nominatim (no key). Please respect usage policy.
 
 Data shape and behavior
 -----------------------
@@ -119,8 +139,8 @@ Data shape and behavior
 Troubleshooting
 ---------------
 
-- Map not visible: ensure a valid Mapbox token is provided and accessible to the admin bundle (e.g., via env var in your Payload config).
-- Styling/CSS: Mapbox GL v3 generally works without importing CSS for this minimal usage. If you add controls/popups and notice styling issues, include `import 'mapbox-gl/dist/mapbox-gl.css'` in your admin CSS bundle.
+- Map not visible: ensure a valid token/API key is provided for `mapbox`/`google` providers (via plugin options or env) and accessible to the admin bundle.
+- Styling/CSS: Map styles are included by the field for Mapbox and Leaflet (`mapbox-gl/dist/mapbox-gl.css`, `leaflet/dist/leaflet.css`). No extra actions are needed in most setups.
 - CORS/Network: Ad blockers or corporate networks may block Nominatim requests. Switch to Mapbox or configure appropriate headers.
 
 TypeScript
