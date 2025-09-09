@@ -45,6 +45,9 @@ export const SearchBar: React.FC<{
           if (e.key === "Enter") onSubmit();
         }}
         placeholder={placeholder || "Search location"}
+        style={{
+          width: "100%",
+        }}
       />
       <button
         type="button"
