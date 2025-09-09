@@ -1,11 +1,12 @@
 import { useField } from "@payloadcms/ui";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { lazy, useCallback, useMemo, useRef, useState } from "react";
 import { envGoogleKey, envMapboxKey } from "../token";
 import { CustomPointFieldClientProps } from "./config";
 import { Footer, SearchBar, useUI } from "./shared";
-import MapboxMap from "./providers/MapboxMap";
-import LeafletMap from "./providers/LeafletMap";
-import GoogleMap from "./providers/GoogleMap";
+
+const MapboxMap = lazy(() => import("./providers/MapboxMap"));
+const LeafletMap = lazy(() => import("./providers/LeafletMap"));
+const GoogleMap = lazy(() => import("./providers/GoogleMap"));
 
 export default function MapPointField(props: CustomPointFieldClientProps) {
   const options = props.field?.admin?.mapPoint || {};
