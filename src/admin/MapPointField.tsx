@@ -1,24 +1,24 @@
-import { useConfig, useTheme } from "@payloadcms/ui";
+import { useField, useTheme } from "@payloadcms/ui";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AdminFieldProps } from "./types";
 import { envPublicKey } from "../token";
+import { CustomPointFieldClientProps } from "./config";
 
-export default function MapPointField(props: AdminFieldProps) {
-	const { value, onChange, field } = props;
-	const options = field?.admin?.mapPoint || {};
+export default function MapPointField(props: CustomPointFieldClientProps) {
+	const options = props.field?.admin?.mapPoint || {};
 	const { theme } = useTheme();
-	const { config } = useConfig();
 
 	const mapContainer = useRef<HTMLDivElement>(null);
 
-	const [query, setQuery] = useState("");
-	const [coords, setCoords] = useState<[number, number] | null>(value || null); // [lng, lat]
+	const { value, setValue } = useField({ path: props.path });
 
-	const apiKey =
-		config.custom?.mapPointPluginOptions?.publicMapKey ||
-		(envPublicKey as string | undefined);
+	const [query, setQuery] = useState("");
+	const [coords, setCoords] = useState<[number, number] | null>(
+		Array.isArray(value) ? (value as [number, number]) : null,
+	);
+
+	const apiKey = props.apiKey || (envPublicKey as string | undefined);
 
 	const mapStyleURL =
 		theme === "dark"
@@ -46,6 +46,7 @@ export default function MapPointField(props: AdminFieldProps) {
 					pinBorder: "var(--theme-elevation-0)",
 				};
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	useEffect(() => {
 		mapboxgl.accessToken = apiKey || envPublicKey;
 
@@ -61,8 +62,7 @@ export default function MapPointField(props: AdminFieldProps) {
 
 			map.on("click", (e) => {
 				setCoords([e.lngLat.lng, e.lngLat.lat]);
-				typeof onChange === "function" &&
-					onChange([e.lngLat.lng, e.lngLat.lat]);
+				setValue([e.lngLat.lng, e.lngLat.lat]);
 			});
 
 			map.addControl(new mapboxgl.NavigationControl(), "top-left");
@@ -72,8 +72,9 @@ export default function MapPointField(props: AdminFieldProps) {
 
 			return () => map.remove();
 		}
-	}, [coords, mapStyleURL, apiKey, onChange]);
+	}, [coords, mapStyleURL, apiKey]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	const geocode = useCallback(async (): Promise<void> => {
 		const provider = options?.geocoder?.provider;
 		const apiKey = options?.geocoder?.apiKey;
@@ -112,13 +113,13 @@ export default function MapPointField(props: AdminFieldProps) {
 
 			if (lng != null && lat != null) {
 				setCoords([lng, lat]);
-				if (typeof onChange === "function") onChange([lng, lat]);
+				setValue([lng, lat]);
 			}
 		} catch (e) {
 			// eslint-disable-next-line no-console
 			console.warn("Geocoding failed", e);
 		}
-	}, [options?.geocoder?.provider, options?.geocoder?.apiKey, query, onChange]);
+	}, [options?.geocoder?.provider, options?.geocoder?.apiKey, query]);
 
 	return (
 		<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -190,26 +191,25 @@ export default function MapPointField(props: AdminFieldProps) {
 			<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
 				<small style={{ opacity: 0.9, color: ui.subtle }}>
 					{value
-						? `Lng, Lat: ${value[0].toFixed(6)}, ${value[1].toFixed(6)}`
+						? `Lng, Lat: ${(value as [number, number])[0]?.toFixed(6)}, ${(value as [number, number])[1]?.toFixed(6)}`
 						: "Click the map to set a point"}
 				</small>
-				{value && (
-					<button
-						type="button"
-						onClick={() => typeof onChange === "function" && onChange(null)}
-						style={{
-							marginLeft: "auto",
-							padding: "6px 10px",
-							background: ui.bgAlt,
-							color: ui.text,
-							border: `1px solid ${ui.border}`,
-							borderRadius: 6,
-							cursor: "pointer",
-						}}
-					>
-						Clear
-					</button>
-				)}
+				<button
+					type="button"
+					disabled={!!value}
+					onClick={() => setValue(null)}
+					style={{
+						marginLeft: "auto",
+						padding: "6px 10px",
+						background: ui.bgAlt,
+						color: ui.text,
+						border: `1px solid ${ui.border}`,
+						borderRadius: 6,
+						cursor: "pointer",
+					}}
+				>
+					Clear
+				</button>
 			</div>
 		</div>
 	);

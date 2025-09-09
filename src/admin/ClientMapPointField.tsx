@@ -1,20 +1,32 @@
 "use client";
-import { useField } from "@payloadcms/ui";
+import {
+	DefaultCellComponentProps,
+	DefaultServerCellComponentProps,
+	FieldClientComponent,
+	FieldDescriptionClientProps,
+	FieldDescriptionServerProps,
+	FieldDiffClientProps,
+	FieldDiffServerProps,
+	FieldServerComponent,
+	PayloadComponent,
+} from "payload";
 import MapPointField from "./MapPointField";
-import type { AdminFieldProps, PointValue } from "./types";
+import { CustomPointFieldClientProps } from "./config";
 
-export default function ClientMapPointField(props: AdminFieldProps) {
-	const { path, field } = props as AdminFieldProps & { [key: string]: any };
+export type ClientComponentsProps = {
+	Cell?: PayloadComponent<
+		DefaultServerCellComponentProps,
+		DefaultCellComponentProps
+	>;
+	Description?: PayloadComponent<
+		FieldDescriptionServerProps,
+		FieldDescriptionClientProps
+	>;
+	Diff?: PayloadComponent<FieldDiffServerProps, FieldDiffClientProps>;
+	Field?: PayloadComponent<FieldClientComponent | FieldServerComponent>;
+	Filter?: PayloadComponent;
+};
 
-	// Bind to Payload form state for this field
-	const { value, setValue } = useField<PointValue>({ path });
-
-	return (
-		<MapPointField
-			path={path}
-			field={field}
-			value={value}
-			onChange={setValue}
-		/>
-	);
-}
+export const ClientMapPointField = (props: CustomPointFieldClientProps) => {
+	return <MapPointField {...props} />;
+};
