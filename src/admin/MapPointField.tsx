@@ -59,6 +59,12 @@ export default function MapPointField(props: AdminFieldProps) {
 				minZoom: 10,
 			});
 
+			map.on("click", (e) => {
+				setCoords([e.lngLat.lng, e.lngLat.lat]);
+				typeof onChange === "function" &&
+					onChange([e.lngLat.lng, e.lngLat.lat]);
+			});
+
 			map.addControl(new mapboxgl.NavigationControl(), "top-left");
 			if (coords) {
 				new mapboxgl.Marker().setLngLat(coords).addTo(map);
@@ -66,7 +72,7 @@ export default function MapPointField(props: AdminFieldProps) {
 
 			return () => map.remove();
 		}
-	}, [coords, mapStyleURL, apiKey]);
+	}, [coords, mapStyleURL, apiKey, onChange]);
 
 	const geocode = useCallback(async (): Promise<void> => {
 		const provider = options?.geocoder?.provider;
