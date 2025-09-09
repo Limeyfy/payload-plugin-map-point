@@ -36,6 +36,7 @@ Notes:
 - `payload`, `react`, and `react-dom` are assumed peer deps in your Payload app.
 - Choose a map provider: Mapbox (token), Google (API key), or Leaflet (no key).
 - Geocoding: Mapbox (token), Google (API key), Nominatim (no key).
+- Leaflet markers: Ensure default marker images are served from your app's public root. At minimum, `/marker-icon.png`, `/marker-icon-2x.png`, and `/marker-shadow.png` must be accessible. If your bundler does not copy them automatically, copy them from `node_modules/leaflet/dist/images` into your `public/` folder so they resolve at those paths.
 
 Quick start
 -----------
