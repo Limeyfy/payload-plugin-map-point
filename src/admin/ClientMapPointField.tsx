@@ -1,5 +1,5 @@
 "use client";
-import {
+import type {
 	DefaultCellComponentProps,
 	DefaultServerCellComponentProps,
 	FieldClientComponent,
@@ -10,8 +10,8 @@ import {
 	FieldServerComponent,
 	PayloadComponent,
 } from "payload";
+import type { CustomPointFieldClientProps } from "./config";
 import MapPointField from "./MapPointField";
-import { CustomPointFieldClientProps } from "./config";
 
 export type ClientComponentsProps = {
 	Cell?: PayloadComponent<

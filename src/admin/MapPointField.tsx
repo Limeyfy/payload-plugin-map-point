@@ -133,14 +133,6 @@ export default function MapPointField(props: CustomPointFieldClientProps) {
 							if (e.key === "Enter") geocode();
 						}}
 						placeholder={options?.geocoder?.placeholder || "Search location"}
-						style={{
-							flex: 1,
-							padding: 8,
-							background: ui.bg,
-							color: ui.text,
-							border: `1px solid ${ui.border}`,
-							borderRadius: 6,
-						}}
 					/>
 					<button
 						type="button"
