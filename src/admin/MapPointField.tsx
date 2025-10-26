@@ -1,3 +1,4 @@
+"use client"
 import { useField } from "@payloadcms/ui";
 import { lazy, useCallback, useMemo, useRef, useState } from "react";
 import { envGoogleKey, envMapboxKey } from "../token";
@@ -9,7 +10,7 @@ const LeafletMap = lazy(() => import("./providers/LeafletMap"));
 const GoogleMap = lazy(() => import("./providers/GoogleMap"));
 
 export default function MapPointField(props: CustomPointFieldClientProps) {
-  const options = props.field?.admin?.mapPoint || {};
+  const [options] = useState(props.field?.admin?.mapPoint || {});
   const ui = useUI();
 
   const mapContainer = useRef<HTMLDivElement>(null);
