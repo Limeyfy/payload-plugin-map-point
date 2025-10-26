@@ -1,3 +1,4 @@
+"use client";
 import * as mod from "@googlemaps/js-api-loader";
 import React, { useEffect, useRef } from "react";
 
