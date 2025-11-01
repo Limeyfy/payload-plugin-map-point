@@ -1,74 +1,75 @@
 {
-  "name": "@limeyfy/payload-plugin-map-point",
-  "version": "1.0.32",
-  "description": "Payload plugin to enhance point fields with a Mapbox map UI and optional geocoding.",
-  "license": "MIT",
-  "type": "module",
-  "main": "dist/index.cjs.js",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs.js"
-    },
-    "./admin/MapPointField": {
-      "types": "./dist/admin/MapPointField.d.ts",
-      "import": "./dist/admin/MapPointField.js",
-      "require": "./dist/admin/MapPointField.cjs.js"
-    },
-    "./admin/ClientMapPointField": {
-      "types": "./dist/admin/ClientMapPointField.d.ts",
-      "import": "./dist/admin/ClientMapPointField.js",
-      "require": "./dist/admin/ClientMapPointField.cjs.js"
-    }
-  },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "tsup",
-    "clean": "rm -rf dist",
-    "prepublishOnly": "pnpm run clean && pnpm run build"
-  },
-  "keywords": [
-    "payload",
-    "payloadcms",
-    "plugin",
-    "mapbox",
-    "geocoder",
-    "point"
-  ],
-  "author": "",
-  "peerDependencies": {
-    "@googlemaps/js-api-loader": ">=1.16.0",
-    "leaflet": ">=1.9.0",
-    "mapbox-gl": ">=3.5.0",
-    "payload": "^3.0.0",
-    "react": ">=18",
-    "react-dom": ">=18"
-  },
-  "peerDependenciesMeta": {
-    "leaflet": {
-      "optional": true
-    },
-    "@googlemaps/js-api-loader": {
-      "optional": true
-    }
-  },
-  "devDependencies": {
-    "@types/mapbox-gl": "^3.4.1",
-    "@types/react": "^19.1.12",
-    "@types/react-dom": "^19.1.9",
-    "tsup": "^8.5.0",
-    "typescript": "^5.9.2"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "dependencies": {
-    "@payloadcms/ui": "^3.54.0",
-    "@types/leaflet": "^1.9.20"
-  }
+	"author": "",
+	"dependencies": {
+		"@biomejs/biome": "2.2.4",
+		"@payloadcms/ui": "^3.54.0",
+		"@types/leaflet": "^1.9.20"
+	},
+	"description": "Payload plugin to enhance point fields with a Mapbox map UI and optional geocoding.",
+	"devDependencies": {
+		"@types/mapbox-gl": "^3.4.1",
+		"@types/react": "^19.1.12",
+		"@types/react-dom": "^19.1.9",
+		"tsup": "^8.5.0",
+		"typescript": "^5.9.2"
+	},
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs.js",
+			"types": "./dist/index.d.ts"
+		},
+		"./admin/ClientMapPointField": {
+			"import": "./dist/admin/ClientMapPointField.js",
+			"require": "./dist/admin/ClientMapPointField.cjs.js",
+			"types": "./dist/admin/ClientMapPointField.d.ts"
+		},
+		"./admin/MapPointField": {
+			"import": "./dist/admin/MapPointField.js",
+			"require": "./dist/admin/MapPointField.cjs.js",
+			"types": "./dist/admin/MapPointField.d.ts"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"keywords": [
+		"payload",
+		"payloadcms",
+		"plugin",
+		"mapbox",
+		"geocoder",
+		"point"
+	],
+	"license": "MIT",
+	"main": "dist/index.cjs.js",
+	"module": "dist/index.js",
+	"name": "@limeyfy/payload-plugin-map-point",
+	"peerDependencies": {
+		"@googlemaps/js-api-loader": ">=1.16.0",
+		"leaflet": ">=1.9.0",
+		"mapbox-gl": ">=3.5.0",
+		"payload": "^3.0.0",
+		"react": ">=18",
+		"react-dom": ">=18"
+	},
+	"peerDependenciesMeta": {
+		"@googlemaps/js-api-loader": {
+			"optional": true
+		},
+		"leaflet": {
+			"optional": true
+		}
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"build": "tsup",
+		"clean": "rm -rf dist",
+		"prepublishOnly": "pnpm run clean && pnpm run build"
+	},
+	"type": "module",
+	"types": "dist/index.d.ts",
+	"version": "1.0.33"
 }
