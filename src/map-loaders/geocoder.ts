@@ -11,6 +11,83 @@ export type GeocodeResult = {
   lat: number;
 } | null;
 
+export type AutocompleteResult = {
+  displayName: string;
+  lng: number;
+  lat: number;
+};
+
+/**
+ * Get autocomplete suggestions for a query string using the specified provider
+ */
+export async function autocomplete(options: GeocodeOptions): Promise<AutocompleteResult[]> {
+  const { provider, apiKey, query: q } = options;
+  const query = q.trim();
+  if (!query) return [];
+
+  try {
+    const results: AutocompleteResult[] = [];
+
+    if (provider === "mapbox") {
+      if (!apiKey) return [];
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${apiKey}&limit=5`;
+      const res = await fetch(url);
+      const data: { features?: Array<{ place_name?: string; center?: [number, number] }> } = await res.json();
+      if (data?.features) {
+        for (const feature of data.features) {
+          const center = feature.center;
+          if (Array.isArray(center) && center.length >= 2 && feature.place_name) {
+            results.push({
+              displayName: feature.place_name,
+              lng: Number(center[0]),
+              lat: Number(center[1]),
+            });
+          }
+        }
+      }
+    } else if (provider === "google") {
+      if (!apiKey) return [];
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${apiKey}`;
+      const res = await fetch(url);
+      const data: { results?: Array<{ formatted_address: string; geometry?: { location?: { lng?: number; lat?: number } } }> } = await res.json();
+      if (data?.results) {
+        for (const result of data.results.slice(0, 5)) {
+          const loc = result.geometry?.location;
+          if (loc?.lng != null && loc?.lat != null) {
+            results.push({
+              displayName: result.formatted_address,
+              lng: Number(loc.lng),
+              lat: Number(loc.lat),
+            });
+          }
+        }
+      }
+    } else {
+      // nominatim by default
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`;
+      const res = await fetch(url, { headers: { "Accept-Language": "en" } });
+      const data: Array<{ display_name?: string; lon?: string | number; lat?: string | number }> = await res.json();
+      if (Array.isArray(data)) {
+        for (const item of data) {
+          if (item.lon && item.lat && item.display_name) {
+            results.push({
+              displayName: item.display_name,
+              lng: Number(item.lon),
+              lat: Number(item.lat),
+            });
+          }
+        }
+      }
+    }
+
+    return results;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn("Autocomplete failed", e);
+    return [];
+  }
+}
+
 /**
  * Geocode a query string using the specified provider
  */
@@ -37,7 +114,7 @@ export async function geocode(options: GeocodeOptions): Promise<GeocodeResult> {
       if (!apiKey) return null;
       const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${apiKey}`;
       const res = await fetch(url);
-      const data: any = await res.json();
+      const data: { results?: Array<{ geometry?: { location?: { lng?: number; lat?: number } } }> } = await res.json();
       const loc = data?.results?.[0]?.geometry?.location;
       if (loc?.lng != null && loc?.lat != null) {
         lng = Number(loc.lng);
